@@ -23,7 +23,7 @@ jobs:
       - name: Deploy to EC2
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            cd /home/ec2-user/auction-backend/api  # Go to the directory where your app is located
+            cd /home/ec2-user/auction-backend-api  # Go to the directory where your app is located
             git pull origin main  # Make sure you are up-to-date
             ./mvnw clean package  # Build the project (if needed)
             java -jar your-app.jar # Run the JAR file
