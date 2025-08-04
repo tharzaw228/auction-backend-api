@@ -14,29 +14,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Step 2: Set up SSH with your private EC2 key
+      # Step 2: Set up JDK to build your project
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      # Step 3: Build the JAR file
+      - name: Build JAR
+        run: ./mvnw clean package -DskipTests
+
+      # Step 4: Set up SSH with your EC2 private key
       - name: Set up SSH agent
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      # Step 3: SSH into EC2 and deploy app
-      - name: Deploy to EC2
+      # Step 5: Upload JAR file to EC2
+      - name: Copy JAR to EC2
+        run: |
+          scp -o StrictHostKeyChecking=no target/auction-backend-0.0.1-SNAPSHOT.jar \
+          ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ec2-user/auction-backend/auction-backend.jar
+
+      # Step 6: Restart app on EC2 via systemd
+      - name: Restart app on EC2
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            cd /home/ec2-user/auction-backend-api  # Your project directory on EC2
-
-            echo "Pulling latest code..."
-            git pull origin main
-
-            echo "Building project..."
-            ./mvnw clean package -DskipTests
-
-            echo "Stopping any running app..."
-            pkill -f 'java' || true
-
-            echo "Starting app in background..."
-            nohup java -jar target/auction-backend-0.0.1-SNAPSHOT.jar > app.log 2>&1 &
-
+            echo "Restarting systemd service..."
+            sudo systemctl restart auction-backend
             echo "Deployment completed!"
           EOF
