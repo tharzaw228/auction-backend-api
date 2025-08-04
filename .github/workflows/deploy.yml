@@ -3,28 +3,40 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - main # This triggers the deployment when you push to the `main` branch
+      - main  # Deploy when pushing to main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      # Step 1: Checkout the code from the repo
+      # Step 1: Checkout code from GitHub repo
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Step 2: Set up SSH key for accessing EC2
-      - name: Set up SSH
+      # Step 2: Set up SSH with your private EC2 key
+      - name: Set up SSH agent
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      # Step 3: SSH into EC2 and deploy the JAR file
+      # Step 3: SSH into EC2 and deploy app
       - name: Deploy to EC2
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            cd /home/ec2-user/auction-backend-api  # Go to the directory where your app is located
-            git pull origin main  # Make sure you are up-to-date
-            ./mvnw clean package  # Build the project (if needed)
-            java -jar your-app.jar # Run the JAR file
+            cd /home/ec2-user/auction-backend-api  # Your project directory on EC2
+
+            echo "Pulling latest code..."
+            git pull origin main
+
+            echo "Building project..."
+            ./mvnw clean package -DskipTests
+
+            echo "Stopping any running app..."
+            pkill -f 'java' || true
+
+            echo "Starting app in background..."
+            nohup java -jar target/auction-backend-api-0.0.1-SNAPSHOT.jar > app.log 2>&1 &
+
+            echo "Deployment completed!"
           EOF
